@@ -7,8 +7,8 @@ from snowflake.snowpark.functions import col, when_matched
 st.title(":cup_with_straw: Pending Smoothie Orders :cup_with_straw:")
 st.write("Order need to be filled!")
 
-# Initialize Snowflake session
-session = get_active_session()
+cnx = st.connection("snowflake")
+session = cnx.session()
 
 # Only select orders where ORDER_FILLED = FALSE
 my_dataframe = session.table("smoothies.public.orders").filter(col("ORDER_FILLED") == False).collect()
