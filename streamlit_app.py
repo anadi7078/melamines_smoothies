@@ -2,39 +2,43 @@
 import streamlit as st
 from snowflake.snowpark.functions import col
 
+
 # Write directly to the app
-st.title(":cup_with_straw: Pending Smoothie Orders :cup_with_straw:")
-st.write("Order need to be filled!")
+st.title(":cup_with_straw: Customize your smoothie :cup_with_straw:")
+st.write("Choose the fruit you want in your custom Smoothie!")
+
+# User input for the name on the smoothie
+name_on_order = st.text_input("Name on Smoothie:")
+st.write("The Name on smoothie is", name_on_order)
 
 cnx = st.connection("snowflake")
 session = cnx.session()
 
-# Only select orders where ORDER_FILLED = FALSE
-my_dataframe = session.table("smoothies.public.orders").filter(col("ORDER_FILLED") == False).collect()
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
 
+# Multi-select ingredients from the available fruits
+ingredients_list = st.multiselect(
+    'Choose up to 5 ingredients',
+    my_dataframe.to_pandas()['FRUIT_NAME'].tolist(),
+    max_selections=5  
+)
 
+if ingredients_list:
+    ingredients_string = ' '.join(ingredients_list)  # Join selected fruits into a string
 
-if my_dataframe:
-        editable_df = st.data_editor(my_dataframe)
-        submitted = st.button('Submit')
+    # Set ORDER_FILLED to FALSE by default (you can change this if needed)
+    order_filled = False
 
+    # Prepare the insert statement
+    my_insert_stmt = f"""
+        INSERT INTO smoothies.public.orders (NAME_ON_ORDER, INGREDIENTS, ORDER_FILLED)
+        VALUES ('{name_on_order}', '{ingredients_string}', {order_filled})
+    """
 
-        if submitted:
-    # After submission, perform the merge operation
-            og_dataset = session.table("smoothies.public.orders")
-            edited_dataset = session.create_dataframe(editable_df)
+    # Create a button to submit the order
+    time_to_insert = st.button('Submit Order')
 
-    # Perform merge to update ORDER_FILLED based on the data edited in the Streamlit interface
+    if time_to_insert:
+        session.sql(my_insert_stmt).collect()
     
-            try:
-                og_dataset.merge(
-                    edited_dataset,
-                    (og_dataset['ORDER_UID'] == edited_dataset['ORDER_UID']),
-                    [when_matched().update({'ORDER_FILLED': edited_dataset['ORDER_FILLED']})]
-            )
-                st.success('Order(s) Updated!', icon='👍')
-            except:
-                st.write('Something went wrong')
-
-else:
-    st.success('Their is no order pending right now', icon='👍')
+        st.success('Your Smoothie is ordered!', icon="✅")
